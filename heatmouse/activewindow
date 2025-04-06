@@ -1,0 +1,41 @@
+import ctypes
+from ctypes import wintypes
+
+import psutil
+import win32gui
+
+# %% --- Constants ---------------------------------------------------------------------
+# %% APP_DICT
+APP_DICT = {"explorer.exe": "File Explorer"}
+
+
+class ActiveWindow:
+    def __init__(self):
+        self.__window = None
+
+    @property
+    def window(self) -> str:
+        return self.__window
+
+    def get_active_window_title():
+        """Returns the title of the currently active window."""
+        user32 = ctypes.windll.user32
+        h_wnd = user32.GetForegroundWindow()
+        pid = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(h_wnd, ctypes.byref(pid))
+        process = psutil.Process(pid.value).name()
+        new_window = win32gui.GetWindowText(win32gui.GetForegroundWindow())
+        if process in APP_DICT.keys():
+            new_window = APP_DICT[process]
+        else:
+            try:
+                new_window = new_window.rsplit(" - ", 1)[1]
+            except IndexError:
+                pass
+        if window != new_window:
+            window = new_window
+
+
+if __name__ == "__main__":
+    active_window_title = get_active_window_title()
+    print(f"Active window title: {active_window_title}")
