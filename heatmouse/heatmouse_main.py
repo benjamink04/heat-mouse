@@ -2,7 +2,7 @@
 import pathlib
 import threading
 
-from PyQt5 import QtCore, QtWidgets, uic
+from PyQt5 import QtWidgets, uic
 
 import heatmouse.activewindow as hactivewindow
 import heatmouse.listener as hlistener

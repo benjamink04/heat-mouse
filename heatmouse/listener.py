@@ -40,7 +40,7 @@ class KeyListener:
 
     def run(self):
         self.start()
-        self.keyboard_listener.join()  # Keep the main thread alive until the listener stops
+        self.keyboard_listener.join()
         self.stop()
         print("Listener stopped")
 
