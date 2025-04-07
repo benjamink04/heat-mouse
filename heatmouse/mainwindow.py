@@ -4,6 +4,7 @@ import threading
 
 from PyQt5 import QtCore, QtWidgets, uic
 
+import heatmouse.activewindow as hactivewindow
 import heatmouse.listener as hlistener
 
 # %% --- Constants ---------------------------------------------------------------------
@@ -22,9 +23,9 @@ class HeatMouse(QtWidgets.QMainWindow):
     # %% --- Methods -------------------------------------------------------------------
     # %% run_listener
     def run_listener(self):
+        active_window = hactivewindow.ActiveWindow()
         key_listener = hlistener.KeyListener()
         event_thread = threading.Thread(target=key_listener.run)
-
         event_thread.daemon = True
         event_thread.start()
 
@@ -32,7 +33,9 @@ class HeatMouse(QtWidgets.QMainWindow):
             while event_thread.is_alive():
                 event = key_listener.get_next_event(timeout=1)
                 if event:
-                    print(f"Button: {event[0]}, Location: {event[1]}, {event[2]}")
+                    print(
+                        f"Application: {active_window.window}, Button: {event[0]}, Location: {event[1]}, {event[2]}"
+                    )
         except KeyboardInterrupt:
             print("Stopping the listener...")
             key_listener.stop()
