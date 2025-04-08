@@ -5,7 +5,7 @@ import sys
 
 from PyQt5 import QtWidgets
 
-from heatmouse import heatmouse_main, qtapp
+from heatmouse import heatmouse_main
 
 
 # %% --- Functions ---------------------------------------------------------------------
@@ -27,11 +27,12 @@ def run() -> QtWidgets.QMainWindow:
         The main window
     """
     ui = heatmouse_main.HeatMouse()
-    return ui.run_listener()
+    return ui.run_gui()
+    # ui.run_listener()
 
 
 # %% --- Main Block --------------------------------------------------------------------
 if __name__ == "__main__":
-    ui = run()
-    if ui:
-        sys.exit(qtapp.exec_())
+    app = QtWidgets.QApplication(sys.argv)
+    window = run()
+    sys.exit(app.exec_())
