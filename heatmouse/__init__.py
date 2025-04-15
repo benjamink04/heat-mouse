@@ -21,7 +21,7 @@ import sys
 
 from PyQt5 import QtWidgets
 
-import heatmouse
+# import heatmouse
 
 # %% --- Constants ---------------------------------------------------------------------
 # %% __version__

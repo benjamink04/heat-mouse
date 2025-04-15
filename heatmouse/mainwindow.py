@@ -1,22 +1,17 @@
 # %% --- Imports -----------------------------------------------------------------------
+import copy
 import ctypes
 import pathlib
+from collections import Counter
 
-# import threading
-import time
-
-# import matplotlib
 import matplotlib.axes as maxes
 import matplotlib.backends.backend_qt5agg as mqt5agg
 import matplotlib.figure as mfigure
 import numpy as np
-from astropy.convolution import convolve
-from astropy.convolution.kernels import Gaussian2DKernel
 from PyQt5 import QtCore, QtGui, QtWidgets, uic
 
+import heatmouse.database as hdatabase
 import heatmouse.threadworker as hthreadworker
-
-# matplotlib.use("GTKAgg")
 
 # %% --- Constants ---------------------------------------------------------------------
 # %% THIS_DIR
@@ -30,14 +25,21 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
     # %% __init__
     def __init__(self, parent=None):
         self._screensize = None
+        self._active_window = None
         self._data = None
+        self._db_data = None
         self._axes = None
         self._canvas = None
         self._figure = None
+        self._bins = None
+        self._database = None
         self._parent = parent
         self._threadpool = QtCore.QThreadPool()
         super().__init__()
         self.heatmap = None
+        self.filter_worker_active = False
+        self.awaiting_filter = False
+
         self._init_gui()
 
     # %% --- Properties ----------------------------------------------------------------
@@ -67,6 +69,14 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
             self._figure = mfigure.Figure()
         return self._figure
 
+    # %% database
+    @property
+    def database(self) -> hdatabase.Database:
+        """Get the HeatMouse database"""
+        if self._database is None:
+            self._database = hdatabase.Database()
+        return self._database
+
     # %% parent
     @property
     def parent(self):
@@ -91,57 +101,117 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
 
     # %% data
     @property
-    def data(self) -> tuple[list, list]:
+    def data(self) -> dict[str : tuple[list, list, list]]:
         if self._data is None:
-            self._data = ([], [])
-        return self._data
+            self._data = copy.deepcopy(self.db_data)
+        try:
+            return self._data[self.active_window]
+        except KeyError:
+            if self.active_window is None:
+                return
+            self._data[self.active_window] = ([], [], [])
+            return self._data[self.active_window]
+
+    # %% db_data
+    @property
+    def db_data(self) -> dict[str : tuple[list, list, list]]:
+        if self._db_data is None:
+            self._db_data = self.database.get_all_data()
+        return self._db_data
+
+    # %% bins
+    @property
+    def bins(self) -> tuple[np.array, np.array]:
+        if self._bins is None:
+            xbins = np.linspace(0, self.screensize[0], self.screensize[0])
+            ybins = np.linspace(0, self.screensize[1], self.screensize[1])
+            self._bins = (ybins, xbins)
+        return self._bins
+
+    # %% active_window
+    @property
+    def active_window(self) -> str:
+        return self._active_window
+
+    @active_window.setter
+    def active_window(self, window):
+        if (window != self._active_window) and (window is not None) and (window != ""):
+            self._active_window = window
+            self._window_change()
 
     # %% --- Methods -------------------------------------------------------------------
     # %% draw
-    def draw(self):
-        heatmap, _, _ = np.histogram2d(
-            self.data[0],
-            self.data[1],
-            bins=(self.screensize[1], self.screensize[0]),
-        )
-        if self.heatmap is None:
-            self.heatmap = self.axes.imshow(
-                convolve(heatmap, Gaussian2DKernel(2, 2)), cmap="viridis"
-            )
-        else:
-            tic = time.time()
-            self.heatmap.set_array(convolve(heatmap, Gaussian2DKernel(2, 2)))
-            print(time.time() - tic)
+    def draw(self, heatmap):
+        self.filter_worker_active = False
+        self.heatmap = heatmap
         self.canvas.restore_region(self.background)
         self.axes.draw_artist(self.heatmap)
         self.canvas.blit(self.axes.bbox)
         # self.axes.imshow(self.data, cmap="viridis")
         # self.canvas.draw()
 
-    # %% thread_task
-    def thread_task(self):
-        self.worker = hthreadworker.Worker()
-        self.worker.signals.update.connect(self._update_data)
-        self.worker.signals.finished.connect(self._task_finished)
-        self.threadpool.start(self.worker)
+    # %% listener_task
+    def listener_task(self):
+        self.listener_worker = hthreadworker.ListenerWorker()
+        self.listener_worker.signals.update.connect(self._update_data)
+        self.listener_worker.signals.finished.connect(self._task_finished)
+        self.threadpool.start(self.listener_worker)
+
+    # %% filter_task
+    def filter_task(self):
+        self.filter_worker = hthreadworker.FilterWorker(
+            self.heatmap, self.data, self.bins, self.axes
+        )
+        self.filter_worker.signals.result.connect(self.draw)
+        self.filter_worker.signals.result.connect(self._check_filter_queue)
+        self.filter_worker_active = True
+        self.threadpool.start(self.filter_worker)
 
     # %% closeEvent
     def closeEvent(self, event: QtGui.QCloseEvent):
         try:
-            self.worker.stop()
+            self.listener_worker.stop()
+            self.filter_worker.stop()
         except AttributeError:
             pass
+        self._store_data()
         event.accept()
 
     # %% --- Protected Methods ---------------------------------------------------------
+    # %% _check_filter_queue
+    def _check_filter_queue(self):
+        if self.awaiting_filter:
+            self.awaiting_filter = False
+            self.filter_task()
+
+    # %% _store_data
+    def _store_data(self):
+        all_data = copy.deepcopy(self._data)
+        print(self.db_data)
+        for key, table_data in self.db_data.items():
+            new_data = []
+            for all_col, db_col in zip(all_data[key], table_data):
+                new_data.append(list((Counter(all_col) - Counter(db_col)).elements()))
+            all_data[key] = tuple(new_data)
+        self.database.store_all_data(all_data)
+
     # %% _update_data
     def _update_data(self, values):
-        # active_window = values[0]
         event = values[1]
-
-        self.data[0].append(event[1])
-        self.data[1].append(event[2])
-        self.draw()
+        if (
+            (event[0] > self.screensize[0])
+            or (event[1] > self.screensize[1])
+            or (values[0] is None)
+        ):
+            return
+        self.active_window = values[0]
+        self.data[0].append(event[0])
+        self.data[1].append(event[1])
+        self.data[2].append(event[2])
+        if not self.filter_worker_active:
+            self.filter_task()
+        else:
+            self.awaiting_filter = True
 
     # %% _task_finished
     def _task_finished(self, out=None):
@@ -155,14 +225,24 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
     def _create_figure(self) -> mfigure.Figure:
         return mfigure.Figure()
 
+    # %% _window_change
+    def _window_change(self):
+        # self.axes.clear()
+        self.axes.set_title(self.active_window)
+        self.canvas.resize_event()
+        # self.background = self.canvas.copy_from_bbox(self.axes.bbox)
+        # self.canvas.restore_region(self.background)
+        # self.canvas.blit(self.axes.bbox)
+        # self.heatmap = None
+
     # %% _init_axes
     def _init_axes(self):
         """Initialize the axes."""
         if self.axes:
             self.axes.remove()
         axes = self.figure.add_subplot()
-        axes.set_xlim(0, self.screensize[0])
-        axes.set_ylim(0, self.screensize[1])
+        axes.get_xaxis().set_visible(False)
+        axes.get_yaxis().set_visible(False)
         self.background = self.canvas.copy_from_bbox(axes.bbox)
 
         # self.figure.colorbar(label="Value")
@@ -175,9 +255,8 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
         """
         self._load_ui()
         self.button_action = QtWidgets.QAction("Start", self)
-        self.button_action.triggered.connect(self.thread_task)
+        self.button_action.triggered.connect(self.listener_task)
         self.toolBar.addAction(self.button_action)
-        # self.widget_Canvas.layout().addWidget(self.toolbar)
         self.widget_Canvas.layout().addWidget(self.canvas)
         self._init_axes()
 

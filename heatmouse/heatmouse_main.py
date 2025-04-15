@@ -1,16 +1,9 @@
 # %% --- Imports -----------------------------------------------------------------------
-
-import pathlib
-
 from PyQt5 import QtWidgets
 
 # import heatmouse.activewindow as hactivewindow
 # import heatmouse.listener as hlistener
 import heatmouse.mainwindow as hmainwindow
-
-# %% --- Constants ---------------------------------------------------------------------
-# %% THIS_DIR
-THIS_DIR = pathlib.Path(__file__).parent.absolute()
 
 
 # %% --- Classes -----------------------------------------------------------------------
