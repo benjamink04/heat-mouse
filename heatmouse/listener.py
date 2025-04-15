@@ -1,7 +1,7 @@
 import queue
 import threading
 
-from pynput import keyboard, mouse
+from pynput import mouse
 
 
 class KeyListener:

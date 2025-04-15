@@ -63,7 +63,8 @@ class Database:
         self._create_table(application)
         for x_position, y_position, click in zip(data[0], data[1], data[2]):
             self.cursor.execute(
-                f"INSERT INTO {application.replace(' ', '_')} VALUES ({x_position}, {y_position}, '{click}');",
+                f"INSERT INTO {application.replace(' ', '_')} ",
+                f"VALUES ({x_position}, {y_position}, '{click}');",
             )
         self.connection.commit()
 
@@ -71,6 +72,7 @@ class Database:
     # %% _create_table
     def _create_table(self, application):
         self.cursor.execute(
-            f"CREATE TABLE IF NOT EXISTS {application.replace(' ', '_')} (x_position INTEGER, y_position INTEGER, click TEXT);",
+            f"CREATE TABLE IF NOT EXISTS {application.replace(' ', '_')}",
+            " (x_position INTEGER, y_position INTEGER, click TEXT);",
         )
         self.connection.commit()

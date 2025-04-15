@@ -31,22 +31,11 @@ class ListenerWorker(QRunnable):
             self.event_thread.daemon = True
             self.event_thread.start()
 
-            try:
-                while self.event_thread.is_alive():
-                    event = self.key_listener.get_next_event(timeout=1)
-                    if event:
+            while self.event_thread.is_alive():
+                event = self.key_listener.get_next_event(timeout=1)
+                if event:
 
-                        self.signals.update.emit((active_window.window, event))
-                        # print(
-                        #     f"Application: {active_window.window}, Button: {event[0]},",
-                        #     f" Location: {event[1]}, {event[2]}",
-                        # )
-            except KeyboardInterrupt:
-                pass
-                # print("Stopping the listener...")
-                # self.key_listener.stop()
-                # self.event_thread.join()  # Ensure the thread is closed
-                # print("Listener stopped.")
+                    self.signals.update.emit((active_window.window, event))
 
         except Exception as e:
             self.signals.error.emit(e)
