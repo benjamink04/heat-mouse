@@ -1,8 +1,8 @@
 # %% --- Imports -----------------------------------------------------------------------
+
+
 from PyQt5 import QtWidgets
 
-# import heatmouse.activewindow as hactivewindow
-# import heatmouse.listener as hlistener
 import heatmouse.mainwindow as hmainwindow
 
 

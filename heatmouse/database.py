@@ -42,12 +42,11 @@ class Database:
             application = application[0]
             data = self.get_data(application)
             table_data[application] = data
+        # print(table_data)
         return table_data
 
     def get_data(self, application):
-        table = pd.read_sql_query(
-            f"SELECT * from {application.replace(' ', '_')};", self.connection
-        )
+        table = pd.read_sql_query(f"SELECT * from '{application}';", self.connection)
         return (
             table["x_position"].to_list(),
             table["y_position"].to_list(),
@@ -55,7 +54,7 @@ class Database:
         )
 
     def store_all_data(self, all_data):
-        print(all_data)
+        # print(all_data)
         for application, data in all_data.items():
             self.store_data(application, data)
 
@@ -63,16 +62,19 @@ class Database:
         self._create_table(application)
         for x_position, y_position, click in zip(data[0], data[1], data[2]):
             self.cursor.execute(
-                f"INSERT INTO {application.replace(' ', '_')} ",
-                f"VALUES ({x_position}, {y_position}, '{click}');",
+                f"""INSERT INTO '{application}' VALUES
+                ({x_position}, {y_position}, '{click}');""",
             )
         self.connection.commit()
 
     # %% --- Protected Methods ---------------------------------------------------------
     # %% _create_table
     def _create_table(self, application):
-        self.cursor.execute(
-            f"CREATE TABLE IF NOT EXISTS {application.replace(' ', '_')}",
-            " (x_position INTEGER, y_position INTEGER, click TEXT);",
-        )
+        try:
+            self.cursor.execute(
+                f"""CREATE TABLE IF NOT EXISTS '{application}'
+                (x_position INTEGER, y_position INTEGER, click TEXT);""",
+            )
+        except sqlite3.OperationalError:
+            print(f'Table could not be created: "{application}"')
         self.connection.commit()

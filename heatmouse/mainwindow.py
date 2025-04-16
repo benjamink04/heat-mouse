@@ -108,7 +108,7 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
             return self._data[self.active_window]
         except KeyError:
             if self.active_window is None:
-                return
+                return None
             self._data[self.active_window] = ([], [], [])
             return self._data[self.active_window]
 
@@ -128,6 +128,12 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
             self._bins = (ybins, xbins)
         return self._bins
 
+    @bins.setter
+    def bins(self, value):
+        xbins = np.linspace(0, self.screensize[0], int(self.screensize[0] / value))
+        ybins = np.linspace(0, self.screensize[1], int(self.screensize[1] / value))
+        self._bins = (ybins, xbins)
+
     # %% active_window
     @property
     def active_window(self) -> str:
@@ -136,7 +142,7 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
     @active_window.setter
     def active_window(self, window):
         if (window != self._active_window) and (window is not None) and (window != ""):
-            self._active_window = window
+            self._active_window = window.replace("'", "")
             self._window_change()
 
     # %% --- Methods -------------------------------------------------------------------
@@ -157,6 +163,18 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
         self.listener_worker.signals.finished.connect(self._task_finished)
         self.threadpool.start(self.listener_worker)
 
+        self.active_window = "Heat Mouse"
+        self.filter_task()
+        self.stackedWidget.setCurrentIndex(1)
+        self.start_action.setEnabled(False)
+        self.stop_action.setEnabled(True)
+
+    # %% listener_stop
+    def listener_stop(self):
+        self.listener_worker.stop()
+        self.start_action.setEnabled(True)
+        self.stop_action.setEnabled(False)
+
     # %% filter_task
     def filter_task(self):
         self.filter_worker = hthreadworker.FilterWorker(
@@ -175,7 +193,16 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
         except AttributeError:
             pass
         self._store_data()
+        self.database.connection.close()
         event.accept()
+
+    # %% update_filter
+    def update_filter(self, value):
+        self.bins = value
+        if not self.filter_worker_active:
+            self.filter_task()
+        else:
+            self.awaiting_filter = True
 
     # %% --- Protected Methods ---------------------------------------------------------
     # %% _check_filter_queue
@@ -187,7 +214,6 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
     # %% _store_data
     def _store_data(self):
         all_data = copy.deepcopy(self._data)
-        print(self.db_data)
         for key, table_data in self.db_data.items():
             new_data = []
             for all_col, db_col in zip(all_data[key], table_data):
@@ -205,6 +231,8 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
         ):
             return
         self.active_window = values[0]
+        if self.data is None:
+            return
         self.data[0].append(event[0])
         self.data[1].append(event[1])
         self.data[2].append(event[2])
@@ -228,7 +256,7 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
     # %% _window_change
     def _window_change(self):
         # self.axes.clear()
-        self.axes.set_title(self.active_window)
+        self.label_Title.setText(self.active_window)
         self.canvas.resize_event()
         # self.background = self.canvas.copy_from_bbox(self.axes.bbox)
         # self.canvas.restore_region(self.background)
@@ -244,9 +272,9 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
         axes.get_xaxis().set_visible(False)
         axes.get_yaxis().set_visible(False)
         self.background = self.canvas.copy_from_bbox(axes.bbox)
-
-        # self.figure.colorbar(label="Value")
         self.axes = axes
+
+        self.figure.tight_layout(pad=0.0)
 
     # %% _init_gui
     def _init_gui(self):
@@ -254,10 +282,38 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
         Initialize the GUI at the end of `__init__` method.
         """
         self._load_ui()
-        self.button_action = QtWidgets.QAction("Start", self)
-        self.button_action.triggered.connect(self.listener_task)
-        self.toolBar.addAction(self.button_action)
+        self.resize(2000, 1200)
+        self.setWindowTitle("Heat Mouse")
+        icon_loc = str(THIS_DIR.joinpath("images\\heatmouse.png"))
+        self.setWindowIcon(QtGui.QIcon(icon_loc))
+
+        icon_loc = str(THIS_DIR.joinpath("images\\play.png"))
+        self.start_action = QtWidgets.QAction(QtGui.QIcon(icon_loc), "Start", self)
+        self.start_action.triggered.connect(self.listener_task)
+        self.toolBar.addAction(self.start_action)
+        icon_loc = str(THIS_DIR.joinpath("images\\stop.png"))
+        self.stop_action = QtWidgets.QAction(QtGui.QIcon(icon_loc), "Stop", self)
+        self.stop_action.setEnabled(False)
+        self.stop_action.triggered.connect(self.listener_stop)
+        self.toolBar.addAction(self.stop_action)
+        self.button_Start.clicked.connect(self.listener_task)
+        self.toolBar.addSeparator()
+        self.spinbox_FilterFactor = QtWidgets.QSpinBox()
+        self.spinbox_FilterFactor.setMinimum(1)
+        self.spinbox_FilterFactor.setMaximum(100)
+        self.spinbox_FilterFactor.valueChanged.connect(self.update_filter)
+        self.toolBar.addWidget(self.spinbox_FilterFactor)
+
+        QtGui.QFontDatabase.addApplicationFont(
+            str(THIS_DIR.joinpath("resources\\PublicPixel.ttf"))
+        )
+        font = QtGui.QFont("Public Pixel", 14)
+        self.label_Title.setFont(font)
+        self.button_Start.setFont(font)
+        self.centralwidget.setAttribute(QtCore.Qt.WA_StyledBackground, True)
+        self.centralwidget.setStyleSheet("background-color: white")
         self.widget_Canvas.layout().addWidget(self.canvas)
+
         self._init_axes()
 
     # %% _load_ui

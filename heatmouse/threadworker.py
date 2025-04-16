@@ -34,7 +34,6 @@ class ListenerWorker(QRunnable):
             while self.event_thread.is_alive():
                 event = self.key_listener.get_next_event(timeout=1)
                 if event:
-
                     self.signals.update.emit((active_window.window, event))
 
         except Exception as e:
@@ -70,15 +69,18 @@ class FilterWorker(QRunnable):
         if self.heatmap is None:
             self.heatmap = self.axes.imshow(
                 convolve(heatmap, Gaussian2DKernel(2, 2)),
-                cmap="viridis",
+                cmap="cividis",
                 extent=[0, len(self.bins[1]), 0, len(self.bins[0])],
             )
         else:
             self.heatmap.set_array(convolve(heatmap, Gaussian2DKernel(2, 2)))
             # self.heatmap.set_array(heatmap)
 
-        self.signals.result.emit(self.heatmap)
-        self.signals.finished.emit()
+        try:
+            self.signals.result.emit(self.heatmap)
+            self.signals.finished.emit()
+        except RuntimeError:
+            pass
 
 
 class WorkerSignals(QObject):

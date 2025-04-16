@@ -14,6 +14,8 @@ setup_app_constants
     Set the entt_common constants for running Heat Mouse.
 """
 
+import ctypes
+
 # %% --- Imports -----------------------------------------------------------------------
 import importlib.metadata as _md
 import pathlib
@@ -28,6 +30,9 @@ from PyQt5 import QtWidgets
 __version__ = _md.version(__name__)
 # %% qtapp
 qtapp = QtWidgets.QApplication(sys.argv)
+# %% myappid
+myappid = "heatmouse.main"
+ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 # %% APP_NAME
 APP_NAME: str = "Heat_Mouse"
 """ The application name."""
