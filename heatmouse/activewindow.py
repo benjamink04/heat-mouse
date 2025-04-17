@@ -1,3 +1,4 @@
+# %% --- Imports -----------------------------------------------------------------------
 import ctypes
 from ctypes import wintypes
 
@@ -6,19 +7,20 @@ import win32gui
 
 # %% --- Constants ---------------------------------------------------------------------
 # %% APP_DICT
-APP_DICT = {"explorer.exe": "File Explorer"}
+APP_DICT = {"explorer.exe": "File Explorer", "Photos.exe": "Photos"}
 
 
+# %% --- Classes -----------------------------------------------------------------------
 class ActiveWindow:
     def __init__(self):
-        self.__window = None
+        self._window = None
 
     @property
     def window(self) -> str:
         active_window = self.get_active_window_title()
-        if self.__window != active_window:
-            self.__window = active_window
-        return self.__window
+        if self._window != active_window:
+            self._window = active_window
+        return self._window
 
     @property
     def active_process(self) -> str:

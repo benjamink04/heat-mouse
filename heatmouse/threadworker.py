@@ -69,7 +69,7 @@ class FilterWorker(QRunnable):
         if self.heatmap is None:
             self.heatmap = self.axes.imshow(
                 convolve(heatmap, Gaussian2DKernel(2, 2)),
-                cmap="cividis",
+                cmap="viridis",
                 extent=[0, len(self.bins[1]), 0, len(self.bins[0])],
             )
         else:

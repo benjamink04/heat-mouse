@@ -10,12 +10,16 @@ import matplotlib.figure as mfigure
 import numpy as np
 from PyQt5 import QtCore, QtGui, QtWidgets, uic
 
+import heatmouse.activeicon as hactiveicon
 import heatmouse.database as hdatabase
+import heatmouse.listitemdelegate as hlistitemdelegate
 import heatmouse.threadworker as hthreadworker
 
 # %% --- Constants ---------------------------------------------------------------------
 # %% THIS_DIR
 THIS_DIR = pathlib.Path(__file__).parent.absolute()
+# %% DESC_ROLE
+DESC_ROLE = QtCore.Qt.UserRole + 1
 
 
 # %% --- Classes -----------------------------------------------------------------------
@@ -24,16 +28,17 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
     # %% --- Dunder Methods ------------------------------------------------------------
     # %% __init__
     def __init__(self, parent=None):
-        self._screensize = None
         self._active_window = None
-        self._data = None
-        self._db_data = None
         self._axes = None
-        self._canvas = None
-        self._figure = None
         self._bins = None
+        self._canvas = None
+        self._data = None
         self._database = None
+        self._db_data = None
+        self._figure = None
         self._parent = parent
+        self._selection = None
+        self._screensize = None
         self._threadpool = QtCore.QThreadPool()
         super().__init__()
         self.heatmap = None
@@ -145,6 +150,18 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
             self._active_window = window.replace("'", "")
             self._window_change()
 
+    # %% selection
+    @property
+    def selection(self) -> str:
+        return self._selection
+
+    @selection.setter
+    def selection(self, window):
+        if (window != self._selection) and (window is not None) and (window != ""):
+            self._selection = window
+            self._window_change()
+            self.filter_task()
+
     # %% --- Methods -------------------------------------------------------------------
     # %% draw
     def draw(self, heatmap):
@@ -163,11 +180,14 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
         self.listener_worker.signals.finished.connect(self._task_finished)
         self.threadpool.start(self.listener_worker)
 
+        self.selection = "Heat Mouse"
         self.active_window = "Heat Mouse"
         self.filter_task()
         self.stackedWidget.setCurrentIndex(1)
+        self.listWidget_ActiveApp.setCurrentRow(0)
         self.start_action.setEnabled(False)
         self.stop_action.setEnabled(True)
+        self.toolBar.setVisible(True)
 
     # %% listener_stop
     def listener_stop(self):
@@ -177,8 +197,11 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
 
     # %% filter_task
     def filter_task(self):
+        data = self.data
+        if self.selection != self.active_window:
+            data = self._data[self.selection]
         self.filter_worker = hthreadworker.FilterWorker(
-            self.heatmap, self.data, self.bins, self.axes
+            self.heatmap, data, self.bins, self.axes
         )
         self.filter_worker.signals.result.connect(self.draw)
         self.filter_worker.signals.result.connect(self._check_filter_queue)
@@ -196,6 +219,17 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
         self.database.connection.close()
         event.accept()
 
+    # %% resizeEvent
+    def resizeEvent(self, event: QtGui.QResizeEvent):
+        try:
+            height = self.listWidget_ActiveApp.itemDelegate().totalHeight
+        except AttributeError:
+            return
+        self.listWidget_ActiveApp.setFixedSize(
+            self.listWidget_ActiveApp.sizeHint().width(),
+            height + 2,
+        )
+
     # %% update_filter
     def update_filter(self, value):
         self.bins = value
@@ -203,6 +237,51 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
             self.filter_task()
         else:
             self.awaiting_filter = True
+
+    # %% populate_applist
+    def populate_applist(self):
+        self.listWidget_Apps.clear()
+        self.listWidget_ActiveApp.clear()
+        for application, table in self._data.items():
+            item = QtWidgets.QListWidgetItem()
+            item.setText(application)
+            item.setData(DESC_ROLE, f"Data points: {len(table[0])}")
+            icon_loc = self.database.get_icon(application)
+            if icon_loc is None:
+                icon_loc = str(THIS_DIR.joinpath("images\\noicon.png"))
+            item.setIcon(QtGui.QIcon(icon_loc))
+            if application == self.active_window:
+                self.listWidget_ActiveApp.addItem(item)
+                if application == self.selection:
+                    self.listWidget_ActiveApp.setCurrentItem(item)
+            else:
+                self.listWidget_Apps.addItem(item)
+                if application == self.selection:
+                    self.listWidget_Apps.setCurrentItem(item)
+
+    # %% update_activeapp
+    def update_activeapp(self):
+        item = self.listWidget_ActiveApp.item(0)
+        item.setData(DESC_ROLE, f"Data points: {len(self.data[0])}")
+
+    # %% on_button_Start_clicked
+    @QtCore.pyqtSlot()
+    def on_button_Start_clicked(self):
+        self.listener_task()
+
+    # %% on_listWidget_Apps
+    def on_listWidget_Apps(self, item):
+        self.listWidget_ActiveApp.clearSelection()
+        selection = item.text()
+        if selection != self.selection:
+            self.selection = selection
+
+    # %% on_listWidget_ActiveApp
+    def on_listWidget_ActiveApp(self, item):
+        self.listWidget_Apps.clearSelection()
+        selection = item.text()
+        if selection != self.selection:
+            self.selection = selection
 
     # %% --- Protected Methods ---------------------------------------------------------
     # %% _check_filter_queue
@@ -236,9 +315,10 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
         self.data[0].append(event[0])
         self.data[1].append(event[1])
         self.data[2].append(event[2])
-        if not self.filter_worker_active:
+        self.update_activeapp()
+        if (not self.filter_worker_active) and (self.selection == self.active_window):
             self.filter_task()
-        else:
+        elif self.selection == self.active_window:
             self.awaiting_filter = True
 
     # %% _task_finished
@@ -255,13 +335,13 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
 
     # %% _window_change
     def _window_change(self):
-        # self.axes.clear()
-        self.label_Title.setText(self.active_window)
+        if self.database.get_icon(self.active_window) is None:
+            icon = hactiveicon.get_active_window_icon(self.active_window)
+            self.database.store_icon(self.active_window, icon)
+            self.data
+        self.populate_applist()
+        self.label_Title.setText(self.selection)
         self.canvas.resize_event()
-        # self.background = self.canvas.copy_from_bbox(self.axes.bbox)
-        # self.canvas.restore_region(self.background)
-        # self.canvas.blit(self.axes.bbox)
-        # self.heatmap = None
 
     # %% _init_axes
     def _init_axes(self):
@@ -282,11 +362,14 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
         Initialize the GUI at the end of `__init__` method.
         """
         self._load_ui()
+        # Load Window
         self.resize(2000, 1200)
         self.setWindowTitle("Heat Mouse")
         icon_loc = str(THIS_DIR.joinpath("images\\heatmouse.png"))
         self.setWindowIcon(QtGui.QIcon(icon_loc))
-
+        self.widget_Canvas.layout().addWidget(self.canvas)
+        self.stackedWidget.setCurrentIndex(0)
+        # Load Toolbar
         icon_loc = str(THIS_DIR.joinpath("images\\play.png"))
         self.start_action = QtWidgets.QAction(QtGui.QIcon(icon_loc), "Start", self)
         self.start_action.triggered.connect(self.listener_task)
@@ -296,14 +379,19 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
         self.stop_action.setEnabled(False)
         self.stop_action.triggered.connect(self.listener_stop)
         self.toolBar.addAction(self.stop_action)
-        self.button_Start.clicked.connect(self.listener_task)
         self.toolBar.addSeparator()
+        self.label_FilterFactor = QtWidgets.QLabel("Gaussian\nFilter Factor:  ")
+        self.toolBar.addWidget(self.label_FilterFactor)
         self.spinbox_FilterFactor = QtWidgets.QSpinBox()
         self.spinbox_FilterFactor.setMinimum(1)
         self.spinbox_FilterFactor.setMaximum(100)
+        self.spinbox_FilterFactor.setValue(4)
+        self.bins = 4
         self.spinbox_FilterFactor.valueChanged.connect(self.update_filter)
         self.toolBar.addWidget(self.spinbox_FilterFactor)
-
+        self.toolBar.addSeparator()
+        self.toolBar.setVisible(False)
+        # Update styles
         QtGui.QFontDatabase.addApplicationFont(
             str(THIS_DIR.joinpath("resources\\PublicPixel.ttf"))
         )
@@ -312,8 +400,16 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
         self.button_Start.setFont(font)
         self.centralwidget.setAttribute(QtCore.Qt.WA_StyledBackground, True)
         self.centralwidget.setStyleSheet("background-color: white")
-        self.widget_Canvas.layout().addWidget(self.canvas)
-
+        # Set delegate and populate application list
+        delegate = hlistitemdelegate.ListItemDelegate(self.listWidget_Apps)
+        self.listWidget_Apps.setItemDelegate(delegate)
+        self.listWidget_Apps.itemClicked.connect(self.on_listWidget_Apps)
+        delegate = hlistitemdelegate.ListItemDelegate(self.listWidget_ActiveApp)
+        self.listWidget_ActiveApp.setItemDelegate(delegate)
+        self.listWidget_ActiveApp.itemClicked.connect(self.on_listWidget_ActiveApp)
+        self.populate_applist()
+        self.resizeEvent(None)
+        # Initialize axes
         self._init_axes()
 
     # %% _load_ui

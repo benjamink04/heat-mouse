@@ -1,4 +1,5 @@
 # %% --- Imports -----------------------------------------------------------------------
+import os
 import pathlib
 import sqlite3
 
@@ -15,6 +16,7 @@ class Database:
     def __init__(self):
         self._connection = None
         self._cursor = None
+        self._init_icons_table()
 
     # %% --- Properties ----------------------------------------------------------------
     # %% connection
@@ -40,13 +42,14 @@ class Database:
         table_data = {}
         for application in tables:
             application = application[0]
+            if application == "icons":
+                continue
             data = self.get_data(application)
             table_data[application] = data
-        # print(table_data)
         return table_data
 
     def get_data(self, application):
-        table = pd.read_sql_query(f"SELECT * from '{application}';", self.connection)
+        table = pd.read_sql_query(f"SELECT * FROM '{application}';", self.connection)
         return (
             table["x_position"].to_list(),
             table["y_position"].to_list(),
@@ -54,7 +57,6 @@ class Database:
         )
 
     def store_all_data(self, all_data):
-        # print(all_data)
         for application, data in all_data.items():
             self.store_data(application, data)
 
@@ -67,6 +69,23 @@ class Database:
             )
         self.connection.commit()
 
+    def get_icon(self, application):
+        self.cursor.execute(
+            f"SELECT icon FROM icons WHERE application='{application}';"
+        )
+        icons = self.cursor.fetchall()
+        if len(icons) == 0:
+            return None
+        icon = icons[0][0]
+        if os.path.exists(icon):
+            return icon
+        self.cursor.execute(f"DELETE FROM icons WHERE application='{application}';")
+        return None
+
+    def store_icon(self, application, icon):
+        self.cursor.execute(f"INSERT INTO icons VALUES ('{application}', '{icon}');")
+        self.connection.commit()
+
     # %% --- Protected Methods ---------------------------------------------------------
     # %% _create_table
     def _create_table(self, application):
@@ -77,4 +96,11 @@ class Database:
             )
         except sqlite3.OperationalError:
             print(f'Table could not be created: "{application}"')
+        self.connection.commit()
+
+    # %% _init_icon_table
+    def _init_icons_table(self):
+        self.cursor.execute(
+            "CREATE TABLE IF NOT EXISTS icons(application TEXT UNIQUE, icon TEXT);"
+        )
         self.connection.commit()
