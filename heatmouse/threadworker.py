@@ -74,7 +74,6 @@ class FilterWorker(QRunnable):
             )
         else:
             self.heatmap.set_array(convolve(heatmap, Gaussian2DKernel(2, 2)))
-            # self.heatmap.set_array(heatmap)
 
         try:
             self.signals.result.emit(self.heatmap)
