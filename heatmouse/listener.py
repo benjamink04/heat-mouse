@@ -1,16 +1,81 @@
+"""
+The HeatMouse listener class used to retrieve mouse click data points.
+
+Classes
+-------
+KeyListener
+    Generates several event threads used to listen and report data to the main thread.
+"""
+
+# %% --- Imports -----------------------------------------------------------------------
 import queue
-import threading
 
 from pynput import mouse
 
 
+# %% --- Classes -----------------------------------------------------------------------
+# %% KeyListener
 class KeyListener:
+    """
+    Generates several event threads used to listen and report data to the main thread.
+
+    Methods
+    -------
+    get_next_event
+        Retrieve the next even from the event queue.
+    on_click
+        Add mouse event to the event queue.
+    run
+        Run the mouse listener.
+    start
+        Start the mouse listener.
+    stop
+        Stop the mouse listener.
+    """
+
+    # %% --- Dunder Methods ------------------------------------------------------------
+    # %% __init__
     def __init__(self):
         self.event_queue = queue.Queue()
         self.mouse_listener = mouse.Listener(on_click=self.on_click)
-        # self.keyboard_listener = keyboard.Listener(on_release=self.on_release)
 
-    def on_click(self, x, y, button, pressed):
+    # %% --- Methods -------------------------------------------------------------------
+    # %% get_next_event
+    def get_next_event(self, timeout: int = None):
+        """
+        Retrieve the next event from the event queue.
+
+        Arguments
+        ---------
+        timeout: int
+            Time delay before executing the next event retrieval. Defaults to None.
+
+        Returns
+        -------
+        tuple
+            The event data.
+        """
+        try:
+            return self.event_queue.get(block=True, timeout=timeout)
+        except queue.Empty:
+            return None
+
+    # %% on_click
+    def on_click(self, x: int, y: int, button: mouse.Button, pressed: bool):
+        """
+        Add mouse event to the event queue.
+
+        Arguments
+        ---------
+        x: int
+            The X-position on the screen.
+        y: int
+            The Y-position on the screen.
+        button: mouse.Button
+            The button pressed on the mouse.
+        pressed: bool
+            Validity bit to check if button was pressed.
+        """
         if pressed:
             if button == mouse.Button.left:
                 button = "LeftClick"
@@ -20,42 +85,20 @@ class KeyListener:
                 button = "MiddleClick"
             self.event_queue.put((x, y, button))
 
-    def start(self):
-        self.mouse_listener.start()
-        # self.keyboard_listener.start()
-
-    def stop(self):
-        self.mouse_listener.stop()
-        # self.keyboard_listener.stop()
-
-    def get_next_event(self, timeout=None):
-        try:
-            return self.event_queue.get(block=True, timeout=timeout)
-        except queue.Empty:
-            return None
-
+    # %% run
     def run(self):
+        """Run the mouse listener."""
         self.start()
         self.mouse_listener.join()
-        # self.keyboard_listener.join()
         self.stop()
         print("Listener stopped")
 
+    # %% start
+    def start(self):
+        """Start the mouse listener."""
+        self.mouse_listener.start()
 
-if __name__ == "__main__":
-    key_listener = KeyListener()
-    event_thread = threading.Thread(target=key_listener.run)
-
-    event_thread.daemon = (
-        True  # Allow the main thread to exit even if this thread is running
-    )
-    event_thread.start()
-
-    try:
-        while event_thread.is_alive():
-            event = key_listener.get_next_event(timeout=1)
-    except KeyboardInterrupt:
-        print("Stopping the listener...")
-        key_listener.stop()
-        event_thread.join()  # Ensure the thread is closed
-        print("Listener stopped.")
+    # %% stop
+    def stop(self):
+        """Stop the mouse listener."""
+        self.mouse_listener.stop()

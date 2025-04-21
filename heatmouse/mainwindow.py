@@ -10,8 +10,8 @@ HeatMouseMainWindow
 # %% --- Imports -----------------------------------------------------------------------
 import copy
 import ctypes
-import pathlib
 from collections import Counter
+from operator import itemgetter
 
 import matplotlib
 import matplotlib.axes as maxes
@@ -20,14 +20,13 @@ import matplotlib.figure as mfigure
 import numpy as np
 from PyQt5 import QtCore, QtGui, QtWidgets, uic
 
+import heatmouse
 import heatmouse.activeicon as hactiveicon
 import heatmouse.database as hdatabase
 import heatmouse.listitemdelegate as hlistitemdelegate
 import heatmouse.threadworker as hthreadworker
 
 # %% --- Constants ---------------------------------------------------------------------
-# %% THIS_DIR
-THIS_DIR = pathlib.Path(__file__).parent.absolute()
 # %% DESC_ROLE
 DESC_ROLE = QtCore.Qt.UserRole + 1
 
@@ -422,10 +421,7 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
             height = self.listWidget_ActiveApp.itemDelegate().totalHeight
         except AttributeError:
             return
-        self.listWidget_ActiveApp.setFixedSize(
-            self.listWidget_ActiveApp.sizeHint().width(),
-            height + 2,
-        )
+        self.listWidget_ActiveApp.setFixedHeight(height + 2)
 
     # %% update_filter
     def update_filter(self, value: int):
@@ -474,16 +470,16 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
         # Load Window
         self.resize(2000, 1200)
         self.setWindowTitle("Heat Mouse")
-        icon_loc = str(THIS_DIR.joinpath("images\\heatmouse.png"))
+        icon_loc = str(heatmouse.THIS_DIR.joinpath("images\\heatmouse.png"))
         self.setWindowIcon(QtGui.QIcon(icon_loc))
         self.widget_Canvas.layout().addWidget(self.canvas)
         self.stackedWidget.setCurrentIndex(0)
         # Load Toolbar
-        icon_loc = str(THIS_DIR.joinpath("images\\play.png"))
+        icon_loc = str(heatmouse.THIS_DIR.joinpath("images\\play.png"))
         self.start_action = QtWidgets.QAction(QtGui.QIcon(icon_loc), "Start", self)
         self.start_action.triggered.connect(self.listener_task)
         self.toolBar.addAction(self.start_action)
-        icon_loc = str(THIS_DIR.joinpath("images\\stop.png"))
+        icon_loc = str(heatmouse.THIS_DIR.joinpath("images\\stop.png"))
         self.stop_action = QtWidgets.QAction(QtGui.QIcon(icon_loc), "Stop", self)
         self.stop_action.setEnabled(False)
         self.stop_action.triggered.connect(self.listener_stop)
@@ -502,7 +498,7 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
         self.toolBar.setVisible(False)
         # Update styles
         QtGui.QFontDatabase.addApplicationFont(
-            str(THIS_DIR.joinpath("resources\\PublicPixel.ttf"))
+            str(heatmouse.THIS_DIR.joinpath("resources\\PublicPixel.ttf"))
         )
         font = QtGui.QFont("Public Pixel", 14)
         self.label_Title.setFont(font)
@@ -525,7 +521,7 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
     # %% _load_ui
     def _load_ui(self):
         """Load the ui file for the GUI."""
-        ui_path = THIS_DIR.joinpath("heatmouse.ui")
+        ui_path = heatmouse.THIS_DIR.joinpath("heatmouse.ui")
         uic.loadUi(str(ui_path), self)
 
     # %% _populate_applist
@@ -533,22 +529,26 @@ class HeatMouseMainWindow(QtWidgets.QMainWindow):
         """Populate the list widgets with application data."""
         self.listWidget_Apps.clear()
         self.listWidget_ActiveApp.clear()
+        item_list = []
         for application, table in self._data.items():
             item = QtWidgets.QListWidgetItem()
             item.setText(application)
             item.setData(DESC_ROLE, f"Data points: {len(table[0])}")
             icon_loc = self.database.get_icon(application)
             if icon_loc is None:
-                icon_loc = str(THIS_DIR.joinpath("images\\noicon.png"))
+                icon_loc = str(heatmouse.THIS_DIR.joinpath("images\\noicon.png"))
             item.setIcon(QtGui.QIcon(icon_loc))
             if application == self.active_window:
                 self.listWidget_ActiveApp.addItem(item)
                 if application == self.selection:
                     self.listWidget_ActiveApp.setCurrentItem(item)
             else:
-                self.listWidget_Apps.addItem(item)
-                if application == self.selection:
-                    self.listWidget_Apps.setCurrentItem(item)
+                item_list.append((item, len(table[0]), application))
+        item_list.sort(key=itemgetter(1), reverse=True)
+        for item_tup in item_list:
+            self.listWidget_Apps.addItem(item_tup[0])
+            if item_tup[2] == self.selection:
+                self.listWidget_Apps.setCurrentItem(item_tup[0])
 
     # %% _show_error_message
     def _show_error_message(self, message: str):

@@ -1,30 +1,19 @@
-"""Run the Heat Mouse."""
+"""Run Heat Mouse."""
 
 # %% --- Imports -----------------------------------------------------------------------
-import pathlib
 import sys
 
 from PyQt5 import QtGui, QtWidgets
 
+import heatmouse
 from heatmouse import heatmouse_main
-
-# %% --- Constants ---------------------------------------------------------------------
-# %% THIS_DIR
-THIS_DIR = pathlib.Path(__file__).parent.absolute()
 
 
 # %% --- Functions ---------------------------------------------------------------------
 # %% run
 def run() -> QtWidgets.QMainWindow:
     """
-    Run the RNPT.
-
-    Parameters
-    ----------
-    show_about : bool
-        If True shows the about GUI
-    project_file : str
-        The project file
+    Run Heat Mouse.
 
     Returns
     -------
@@ -33,13 +22,12 @@ def run() -> QtWidgets.QMainWindow:
     """
     ui = heatmouse_main.HeatMouse()
     return ui.run_gui()
-    # ui.run_listener()
 
 
 # %% --- Main Block --------------------------------------------------------------------
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
-    icon_loc = str(THIS_DIR.joinpath("images\\heatmouse.ico"))
+    icon_loc = str(heatmouse.THIS_DIR.joinpath("images\\heatmouse.ico"))
     app.setWindowIcon(QtGui.QIcon(icon_loc))
     window = run()
     sys.exit(app.exec_())

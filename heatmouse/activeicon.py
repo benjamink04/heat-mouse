@@ -1,18 +1,37 @@
-# %% --- Imports -----------------------------------------------------------------------
-import pathlib
+"""
+The HeatMouse active window class used to retrieve the current active window.
 
+Functions
+-------
+get_active_window_icon
+    Get the icon from the active window on the user monitor.
+"""
+
+# %% --- Imports -----------------------------------------------------------------------
 import win32con
 import win32gui
 import win32ui
 from PIL import Image
 
-# %% --- Constants ---------------------------------------------------------------------
-# %% PARENT_DIR
-PARENT_DIR = pathlib.Path(__file__).parent.parent.absolute()
+import heatmouse
 
 
-def get_active_window_icon(active_window):
-    # Get handle to the foreground window
+# %% --- Functions ---------------------------------------------------------------------
+# %% get_active_window_icon
+def get_active_window_icon(active_window: str) -> str:
+    """
+    Get the icon from the active window on the user monitor.
+
+    Arguments
+    ---------
+    active_window: str
+        The active window on the user monitor.
+
+    Returns
+    -------
+    str
+        The locally saved icon path.
+    """
     output_path = None
     hwnd = win32gui.GetForegroundWindow()
     if not hwnd:
@@ -63,7 +82,9 @@ def get_active_window_icon(active_window):
             1,
         )
         # Save the image
-        output_path = str(PARENT_DIR.joinpath(f"database\\{active_window}.png"))
+        output_path = str(
+            heatmouse.PARENT_DIR.joinpath(f"database\\{active_window}.png")
+        )
         img.save(output_path)
     except Exception as e:
         print(f"Error processing icon: {str(e)}")
