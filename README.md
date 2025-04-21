@@ -22,8 +22,6 @@ python -m heatmouse
 
 ## Authors
 
-Contributors names and contact info
-
 Benjamin Katz 
 
 ## Version History
@@ -33,4 +31,4 @@ Benjamin Katz
 
 ## License
 
-This project is licensed under the [MIT] License - see the LICENSE.md file for details
+This project is licensed under the MIT License - see the LICENSE.md file for details
