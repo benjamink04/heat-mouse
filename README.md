@@ -10,7 +10,9 @@ Heat Mouse provides you with mouse clicking data gathering for all applications 
 
 ### Installing
 
-```pip install heatmouse```
+```
+pip install heatmouse
+```
 
 ### Executing program
 
