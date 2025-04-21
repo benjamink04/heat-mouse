@@ -2,9 +2,8 @@
 Initialize the Heat Mouse package.
 """
 
-import ctypes
-
 # %% --- Imports -----------------------------------------------------------------------
+import ctypes
 import importlib.metadata as _md
 import pathlib
 import sys

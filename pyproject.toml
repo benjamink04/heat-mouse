@@ -23,7 +23,15 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
 ]
 dependencies = [
-    "pynput>=1.8.1"
+    "pynput>=1.8.1",
+    "PyQt5",
+    "matplotlib",
+    "pywin32",
+    "pillow",
+    "psutil",
+    "pandas",
+    "numpy",
+    "astropy"
 ]
 dynamic = ["version"]
 requires-python = ">=3.7"
