@@ -2,6 +2,12 @@
 database/*
 heatmouse/_version.py
 
+# VS Code
+.vscode/
+
+# Local virtualenv
+venv/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
